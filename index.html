@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workshop Planner Pro</title>
+    <style>
+        body { background-color: #2c2c2c; color: white; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; }
+        
+        /* Header Layout */
+        .header-main { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .logo-area { display: flex; flex-direction: column; width: 250px; }
+        .powered-badge { background: #444; color: #ccc; padding: 3px 10px; font-size: 10px; font-weight: bold; border-radius: 4px; margin-bottom: 5px; width: fit-content; }
+        .logo-img { width: 180px; }
+        .logo-right { width: 220px; text-align: right; }
+        #live-clock { font-size: 28px; font-weight: 900; text-align: center; flex-grow: 1; }
+
+        /* Action Buttons */
+        .action-bar { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+        .btn { padding: 15px; border: none; border-radius: 6px; font-weight: bold; font-size: 18px; cursor: pointer; transition: 0.2s; }
+        .btn-add { background-color: #28a745; color: white; }
+        .btn-job { background-color: #007bff; color: white; }
+        .btn-parts { background-color: #fd7e14; color: white; }
+
+        /* Messaging Grid */
+        .message-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 20px; }
+        .msg-box { border-radius: 10px; padding: 15px; min-height: 120px; position: relative; }
+        .red-box { background-color: #b91c1c; } .blue-box { background-color: #1e40af; } .orange-box { background-color: #c2410c; }
+        .text-display { background: white; color: #333; padding: 10px; border-radius: 5px; min-height: 50px; margin-top: 10px; font-weight: 600; }
+        .edit-btn { position: absolute; top: 10px; right: 10px; background: rgba(255,255,255,0.3); border: 1px solid white; color: white; cursor: pointer; border-radius: 4px; padding: 2px 8px; }
+
+        /* Calendar Styling */
+        .calendar-wrapper { background: #3d3d3d; border-radius: 10px; padding: 20px; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; margin-top: 15px; }
+        .day-col { background: #4a4a4a; min-height: 450px; border-radius: 5px; padding: 10px; border: 1px solid #555; }
+        .day-label { text-align: center; border-bottom: 2px solid #666; padding-bottom: 8px; margin-bottom: 10px; font-weight: bold; }
+        
+        .task-card { background: #fff; color: #333; padding: 10px; border-radius: 4px; margin-bottom: 10px; font-size: 13px; position: relative; border-left: 5px solid #28a745; box-shadow: 0 2px 4px rgba(0,0,0,0.2); cursor: pointer; }
+        .task-card.completed { opacity: 0.5; text-decoration: line-through; border-left-color: #888; }
+        .complete-btn { font-size: 10px; margin-top: 8px; cursor: pointer; background: #eee; border: 1px solid #ccc; width: 100%; padding: 4px; border-radius: 3px; }
+
+        /* Modals & Overlays */
+        #taskModal, #pinModal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2c2c2c; padding: 25px; border-radius: 12px; border: 2px solid #28a745; z-index: 1001; width: 350px; box-shadow: 0 0 30px #000; }
+        #taskModal input, #taskModal select, #taskModal textarea, #pinInput { width: 100%; padding: 10px; margin: 10px 0; background: #444; color: white; border: 1px solid #555; box-sizing: border-box; font-size: 16px; }
+        .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; }
+        .modal-footer { display: flex; gap: 10px; margin-top: 15px; }
+        .btn-delete { background-color: #dc3545; color: white; flex: 1; padding: 10px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="overlay" id="overlay" onclick="closeAllModals()"></div>
+    <div id="pinModal">
+        <h3 id="pinTitle">Security Check</h3>
+        <p style="font-size: 12px; color: #aaa;">Please enter your authorization PIN</p>
+        <input type="password" id="pinInput" placeholder="Enter PIN" autofocus>
+        <button class="btn btn-add" style="width: 100%;" onclick="validatePin()">Submit</button>
+    </div>
+
+    <div class="header-main">
+        <div class="logo-area">
+            <div class="powered-badge">POWERED BY</div>
+            <img src="https://www.blucomputers.co.uk/gallery_gen/cd6f202757dcc4e33c805062d83679ca_fit.png?ts=1766441461" class="logo-img">
+        </div>
+        <div id="live-clock">Loading Time...</div>
+        <div class="logo-right">
+            <img src="https://yt3.googleusercontent.com/ALVj_P2dKFKVtWYiPy8q7q0Qrn3fB4V0x2qIZ6Uf5NCzWHQITizBUIpgl_sb7Uf1ijilUZYe2OA=s900-c-k-c0x00ffffff-no-rj" style="width: 220px; height: auto;">
+        </div>
+    </div>
+
+    <div class="action-bar">
+        <button class="btn btn-add" onclick="requestPin('0207', 'add-task')">Add Task +</button>
+        <button class="btn btn-job" onclick="window.open('https://www.blucomputers.co.uk/', '_blank')">Job Card</button>
+        <button class="btn btn-parts" onclick="window.open('https://www.blucomputers.co.uk/', '_blank')">Parts Used Sheet</button>
+    </div>
+
+    <div class="message-grid">
+        <div class="msg-box red-box"><strong>VOR Vehicles</strong><button class="edit-btn" onclick="requestPin('0207', 'edit-box', 'vor-text')">Edit</button><div class="text-display" id="vor-text">...</div></div>
+        <div class="msg-box blue-box"><strong>General Messages</strong><button class="edit-btn" onclick="requestPin('0207', 'edit-box', 'gen-text')">Edit</button><div class="text-display" id="gen-text">...</div></div>
+        <div class="msg-box orange-box"><strong>Workshop Notices</strong><button class="edit-btn" onclick="requestPin('0207', 'edit-box', 'not-text')">Edit</button><div class="text-display" id="not-text">...</div></div>
+    </div>
+
+    <div class="calendar-wrapper">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <button onclick="changeWeek(-1)">◀ Previous Week</button>
+            <h2 id="calendar-week-range">Workshop Schedule</h2>
+            <button onclick="changeWeek(1)">Next Week ▶</button>
+        </div>
+        <div class="calendar-grid" id="calendar-grid"></div>
+    </div>
+
+    <div id="taskModal">
+        <h3 id="modalTitle">New Workshop Job</h3>
+        <input type="date" id="tDate">
+        <select id="tTech">
+            <option>Tech 1</option><option>Tech 2</option><option>Tech 3</option><option>Tech 4</option><option>Tech 5</option>
+            <option>External Contractor</option><option>Master Tech</option><option>Service manager</option><option>Other</option>
+        </select>
+        <select id="tRecur">
+            <option value="none">One time</option>
+            <option value="7">Every week</option>
+            <option value="35">Every 5 weeks</option>
+            <option value="42">Every 6 weeks</option>
+            <option value="30">Every month</option>
+            <option value="182">Every 6 months</option>
+            <option value="365">Every year</option>
+        </select>
+        <textarea id="tDesc" placeholder="Job Description"></textarea>
+        <div class="modal-footer">
+            <button id="saveBtn" class="btn btn-add" style="flex: 2;" onclick="saveJob()">Add Job</button>
+            <button id="deleteBtn" class="btn-delete" onclick="deleteJob()">Delete</button>
+        </div>
+        <button onclick="closeAllModals()" style="width:100%; background:none; border:none; color:#888; margin-top:10px; cursor:pointer;">Cancel</button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, onValue, set, push, update, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDJ3Jo-HVk0KBi2doFhG4BsZA2AS4EmV3I",
+            authDomain: "workshop-planner-pro.firebaseapp.com",
+            databaseURL: "https://workshop-planner-pro-default-rtdb.firebaseio.com/",
+            projectId: "workshop-planner-pro",
+            storageBucket: "workshop-planner-pro.appspot.com",
+            appId: "1:650861664504:web:0a6144e5c716ed4584030d"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        let currentWeekOffset = 0;
+        let editingTaskId = null;
+        let pendingAction = null;
+        let requiredPin = "";
+
+        // --- CLOCK ---
+        function updateClock() {
+            const now = new Date();
+            const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            const day = days[now.getDay()], date = now.getDate(), month = months[now.getMonth()], hrs = String(now.getHours()).padStart(2, '0'), mins = String(now.getMinutes()).padStart(2, '0');
+            let sfx = (date%10==1&&date!=11)?'st':(date%10==2&&date!=12)?'nd':(date%10==3&&date!=13)?'rd':'th';
+            document.getElementById('live-clock').innerText = `${day} ${date}${sfx} ${month} ${hrs}.${mins}`;
+        }
+        setInterval(updateClock, 1000);
+
+        // --- PIN SECURITY LOGIC ---
+        window.requestPin = (pin, action, target, extraData = null) => {
+            requiredPin = pin;
+            pendingAction = { action, target, extraData };
+            document.getElementById('pinInput').value = "";
+            document.getElementById('pinModal').style.display = 'block';
+            document.getElementById('overlay').style.display = 'block';
+            document.getElementById('pinInput').focus();
+        };
+
+        window.validatePin = () => {
+            const input = document.getElementById('pinInput').value;
+            if (input === requiredPin) {
+                executeAction();
+            } else {
+                alert("Incorrect PIN");
+                closeAllModals();
+            }
+        };
+
+        function executeAction() {
+            const { action, target, extraData } = pendingAction;
+            document.getElementById('pinModal').style.display = 'none';
+            
+            if (action === 'add-task') {
+                openTaskModal();
+            } else if (action === 'edit-box') {
+                const content = prompt("Enter text:");
+                if (content !== null) set(ref(db, 'messages/' + target), content);
+                closeAllModals();
+            } else if (action === 'edit-task') {
+                openTaskModal(target, extraData);
+            }
+        }
+
+        // --- MODAL CONTROLS ---
+        window.openTaskModal = (taskId = null, taskData = null) => {
+            editingTaskId = taskId;
+            const delBtn = document.getElementById('deleteBtn');
+            document.getElementById('modalTitle').innerText = taskId ? "Edit Job" : "New Workshop Job";
+            document.getElementById('saveBtn').innerText = taskId ? "Update Job" : "Add Job To Calendar";
+            
+            if (taskId) {
+                delBtn.style.display = "block";
+                document.getElementById('tDate').value = taskData.date;
+                document.getElementById('tTech').value = taskData.tech;
+                document.getElementById('tRecur').value = taskData.recur;
+                document.getElementById('tDesc').value = taskData.desc;
+            } else {
+                delBtn.style.display = "none";
+                document.getElementById('tDate').value = new Date().toISOString().split('T')[0];
+                document.getElementById('tDesc').value = "";
+            }
+            document.getElementById('taskModal').style.display='block';
+            document.getElementById('overlay').style.display='block';
+        };
+
+        window.closeAllModals = () => {
+            document.getElementById('taskModal').style.display='none';
+            document.getElementById('pinModal').style.display='none';
+            document.getElementById('overlay').style.display='none';
+            editingTaskId = null;
+        };
+
+        // --- FIREBASE SYNC ---
+        ['vor-text', 'gen-text', 'not-text'].forEach(id => {
+            onValue(ref(db, 'messages/' + id), (s) => { 
+                if(s.exists()) document.getElementById(id).innerText = s.val(); 
+            });
+        });
+
+        window.saveJob = () => {
+            const job = { 
+                date: document.getElementById('tDate').value, 
+                tech: document.getElementById('tTech').value, 
+                recur: document.getElementById('tRecur').value, 
+                desc: document.getElementById('tDesc').value, 
+                completed: false 
+            };
+            if(!job.date) return alert("Select a date");
+            if (editingTaskId) { update(ref(db, `tasks/${editingTaskId}`), job); } 
+            else { push(ref(db, 'tasks'), job); }
+            closeAllModals();
+        };
+
+        window.deleteJob = () => {
+            if (editingTaskId && confirm("Delete this job?")) {
+                remove(ref(db, `tasks/${editingTaskId}`));
+                closeAllModals();
+            }
+        };
+
+        window.toggleComplete = (id, currentStatus) => {
+            update(ref(db, `tasks/${id}`), { completed: !currentStatus });
+        };
+
+        window.changeWeek = (dir) => { currentWeekOffset += dir; renderCalendar(); };
+
+        function renderCalendar() {
+            onValue(ref(db, 'tasks'), (snapshot) => {
+                const tasks = snapshot.val() || {};
+                const grid = document.getElementById('calendar-grid');
+                grid.innerHTML = '';
+                
+                let startOfWeek = new Date();
+                let dayOffset = startOfWeek.getDay() === 0 ? 6 : startOfWeek.getDay() - 1;
+                startOfWeek.setDate(startOfWeek.getDate() - dayOffset + (currentWeekOffset * 7));
+
+                for (let i = 0; i < 7; i++) {
+                    let currentDay = new Date(startOfWeek);
+                    currentDay.setDate(currentDay.getDate() + i);
+                    currentDay.setHours(0,0,0,0);
+                    
+                    const dateStr = currentDay.toISOString().split('T')[0];
+                    const dayCol = document.createElement('div');
+                    dayCol.className = 'day-col';
+                    dayCol.innerHTML = `<div class="day-label">${currentDay.toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short'})}</div>`;
+                    
+                    Object.keys(tasks).forEach(id => {
+                        const t = tasks[id];
+                        const taskStart = new Date(t.date);
+                        taskStart.setHours(0,0,0,0);
+
+                        let showTask = false;
+                        if (t.date === dateStr) {
+                            showTask = true;
+                        } else if (t.recur !== "none" && currentDay > taskStart) {
+                            const diffDays = Math.round((currentDay.getTime() - taskStart.getTime()) / (1000 * 60 * 60 * 24));
+                            if (t.recur === "30") { if (currentDay.getDate() === taskStart.getDate()) showTask = true; }
+                            else if (t.recur === "365") { if (currentDay.getDate() === taskStart.getDate() && currentDay.getMonth() === taskStart.getMonth()) showTask = true; }
+                            else {
+                                const interval = parseInt(t.recur);
+                                if (diffDays % interval === 0) showTask = true;
+                            }
+                        }
+
+                        if (showTask) {
+                            const taskEl = document.createElement('div');
+                            taskEl.className = `task-card ${t.completed ? 'completed' : ''}`;
+                            taskEl.onclick = (e) => {
+                                if(e.target.tagName !== 'BUTTON') {
+                                    requestPin('1984', 'edit-task', id, t);
+                                }
+                            };
+                            taskEl.innerHTML = `<strong>${t.tech}</strong><br>${t.desc}<button class="complete-btn" onclick="toggleComplete('${id}', ${t.completed})">${t.completed ? 'Revert' : 'Complete'}</button>`;
+                            dayCol.appendChild(taskEl);
+                        }
+                    });
+                    grid.appendChild(dayCol);
+                }
+            });
+        }
+
+        renderCalendar();
+        updateClock();
+    </script>
+</body>
+</html>
