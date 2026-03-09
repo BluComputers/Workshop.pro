@@ -50,6 +50,7 @@
 <body>
 
     <div class="overlay" id="overlay" onclick="closeAllModals()"></div>
+    
     <div id="pinModal">
         <h3 id="pinTitle">Security Check</h3>
         <p style="font-size: 12px; color: #aaa;">Please enter your authorization PIN</p>
@@ -70,8 +71,8 @@
 
     <div class="action-bar">
         <button class="btn btn-add" onclick="requestPin('0207', 'add-task')">Add Task +</button>
-        <button class="btn btn-job" onclick="window.open('https://www.blucomputers.co.uk/', '_blank')">Job Card</button>
-        <button class="btn btn-parts" onclick="window.open('https://www.blucomputers.co.uk/', '_blank')">Parts Used Sheet</button>
+        <button class="btn btn-job" onclick="openJobCard()">Job Card</button>
+        <button class="btn btn-parts" onclick="openPartsRequest()">Parts Request</button>
     </div>
 
     <div class="message-grid">
@@ -144,6 +145,113 @@
         }
         setInterval(updateClock, 1000);
 
+        // --- FORM GENERATORS ---
+        window.openJobCard = () => {
+            const id = Math.floor(100000 + Math.random() * 900000);
+            const now = new Date();
+            const dateStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            const html = generateTemplate("WORKSHOP JOB CARD", id, dateStr, "Job #", false);
+            const win = window.open('', '_blank');
+            win.document.write(html);
+            win.document.close();
+        };
+
+        window.openPartsRequest = () => {
+            const id = "ORW" + Math.floor(100000 + Math.random() * 900000);
+            const now = new Date();
+            const dateStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            const html = generateTemplate("INTERNAL PARTS REQUEST FORM", id, dateStr, "Order #", true);
+            const win = window.open('', '_blank');
+            win.document.write(html);
+            win.document.close();
+        };
+
+        function generateTemplate(title, id, date, idLabel, isRequest) {
+            const titleStyle = isRequest 
+                ? `background: #ffff00; color: #ff0000; padding: 15px 30px; display: inline-block; border: 3px solid #ff0000; font-weight: 900; text-transform: uppercase; font-size: 22px;` 
+                : `color: #d32f2f; margin: 0; font-size: 28px; text-transform: uppercase;`;
+
+            return `
+                <html>
+                <head>
+                    <title>${title}</title>
+                    <style>
+                        body { font-family: 'Segoe UI', sans-serif; background: #f4f4f4; padding: 20px; }
+                        .card { max-width: 850px; margin: auto; background: white; border-top: 10px solid #d32f2f; padding: 30px; box-shadow: 0 0 15px rgba(0,0,0,0.1); }
+                        header { display: flex; flex-direction: column; align-items: center; border-bottom: 2px solid #333; padding-bottom: 15px; margin-bottom: 25px; text-align: center; }
+                        .meta-header { width: 100%; display: flex; justify-content: space-between; margin-top: 15px; font-size: 14px; color: #333; }
+                        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px; text-align: left; }
+                        label { display: block; font-weight: bold; font-size: 13px; margin-bottom: 6px; color: #444; }
+                        input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 14px; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                        th { background: #333; color: white; text-align: left; padding: 12px; font-size: 14px; }
+                        td { padding: 10px; border-bottom: 1px solid #ddd; }
+                        .btn-add { background: #333; color: white; padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; margin-top: 15px; font-weight: bold; }
+                        .btn-print { background: #d32f2f; color: white; width: 100%; padding: 18px; border: none; border-radius: 6px; font-weight: bold; font-size: 16px; margin-top: 30px; cursor: pointer; text-transform: uppercase; }
+                        @media print { .btn-add, .btn-print, .del-row { display: none; } .card { box-shadow: none; border: 1px solid #eee; } }
+                    </style>
+                </head>
+                <body>
+                    <div class="card">
+                        <header>
+                            <div style="${titleStyle}">${title}</div>
+                            <div class="meta-header">
+                                <div><strong>${idLabel}:</strong> ${id}</div>
+                                <div><strong>Date/Time:</strong> ${date}</div>
+                            </div>
+                        </header>
+                        
+                        <div class="grid">
+                            <div><label>Vehicle Registration</label><input type="text" placeholder="REXX XXX"></div>
+                            ${isRequest ? '' : '<div><label>VIN Number</label><input type="text"></div>'}
+                            <div><label>Technician / Requester</label><input type="text"></div>
+                            <div><label>Priority Status</label>
+                                <select>
+                                    <option>Level 1 - General Stock</option>
+                                    <option>Level 2 - Required for Next PMI</option>
+                                    <option>Level 3 - URGENTLY NEEDED TODAY</option>
+                                    <option>Level 4 - VOR</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <label>Reason for Request / Job Notes</label>
+                        <textarea style="height:80px" placeholder="Details..."></textarea>
+
+                        <h3 style="margin-top:25px; border-bottom: 2px solid #d32f2f; padding-bottom: 5px; color: #333; text-align: left;">Parts List</h3>
+                        <table id="pTable">
+                            <thead>
+                                <tr>
+                                    <th style="width: 25%;">Part Number</th>
+                                    <th>Part Description</th>
+                                    <th style="width: 10%;">Qty</th>
+                                    <th class="del-row" style="width: 40px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><input type="text"></td>
+                                    <td><input type="text"></td>
+                                    <td><input type="number" value="1"></td>
+                                    <td class="del-row"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <button class="btn-add" onclick="addRow()">+ Add Row</button>
+                        <button class="btn-print" onclick="window.print()">Print Form</button>
+                    </div>
+                    <script>
+                        function addRow() {
+                            const table = document.getElementById('pTable').getElementsByTagName('tbody')[0];
+                            const row = table.insertRow(-1);
+                            row.innerHTML = '<td><input type="text"></td><td><input type="text"></td><td><input type="number" value="1"></td><td class="del-row"><button onclick="this.parentElement.parentElement.remove()" style="background:none; border:none; color:red; cursor:pointer; font-weight:bold;">✕</button></td>';
+                        }
+                    <\/script>
+                </body>
+                </html>
+            `;
+        }
+
         // --- PIN SECURITY LOGIC ---
         window.requestPin = (pin, action, target, extraData = null) => {
             requiredPin = pin;
@@ -156,27 +264,19 @@
 
         window.validatePin = () => {
             const input = document.getElementById('pinInput').value;
-            if (input === requiredPin) {
-                executeAction();
-            } else {
-                alert("Incorrect PIN");
-                closeAllModals();
-            }
+            if (input === requiredPin) { executeAction(); } 
+            else { alert("Incorrect PIN"); closeAllModals(); }
         };
 
         function executeAction() {
             const { action, target, extraData } = pendingAction;
             document.getElementById('pinModal').style.display = 'none';
-            
-            if (action === 'add-task') {
-                openTaskModal();
-            } else if (action === 'edit-box') {
+            if (action === 'add-task') { openTaskModal(); } 
+            else if (action === 'edit-box') {
                 const content = prompt("Enter text:");
                 if (content !== null) set(ref(db, 'messages/' + target), content);
                 closeAllModals();
-            } else if (action === 'edit-task') {
-                openTaskModal(target, extraData);
-            }
+            } else if (action === 'edit-task') { openTaskModal(target, extraData); }
         }
 
         // --- MODAL CONTROLS ---
@@ -185,7 +285,6 @@
             const delBtn = document.getElementById('deleteBtn');
             document.getElementById('modalTitle').innerText = taskId ? "Edit Job" : "New Workshop Job";
             document.getElementById('saveBtn').innerText = taskId ? "Update Job" : "Add Job To Calendar";
-            
             if (taskId) {
                 delBtn.style.display = "block";
                 document.getElementById('tDate').value = taskData.date;
@@ -247,7 +346,6 @@
                 const tasks = snapshot.val() || {};
                 const grid = document.getElementById('calendar-grid');
                 grid.innerHTML = '';
-                
                 let startOfWeek = new Date();
                 let dayOffset = startOfWeek.getDay() === 0 ? 6 : startOfWeek.getDay() - 1;
                 startOfWeek.setDate(startOfWeek.getDate() - dayOffset + (currentWeekOffset * 7));
@@ -256,7 +354,6 @@
                     let currentDay = new Date(startOfWeek);
                     currentDay.setDate(currentDay.getDate() + i);
                     currentDay.setHours(0,0,0,0);
-                    
                     const dateStr = currentDay.toISOString().split('T')[0];
                     const dayCol = document.createElement('div');
                     dayCol.className = 'day-col';
@@ -266,11 +363,9 @@
                         const t = tasks[id];
                         const taskStart = new Date(t.date);
                         taskStart.setHours(0,0,0,0);
-
                         let showTask = false;
-                        if (t.date === dateStr) {
-                            showTask = true;
-                        } else if (t.recur !== "none" && currentDay > taskStart) {
+                        if (t.date === dateStr) { showTask = true; } 
+                        else if (t.recur !== "none" && currentDay > taskStart) {
                             const diffDays = Math.round((currentDay.getTime() - taskStart.getTime()) / (1000 * 60 * 60 * 24));
                             if (t.recur === "30") { if (currentDay.getDate() === taskStart.getDate()) showTask = true; }
                             else if (t.recur === "365") { if (currentDay.getDate() === taskStart.getDate() && currentDay.getMonth() === taskStart.getMonth()) showTask = true; }
@@ -284,9 +379,7 @@
                             const taskEl = document.createElement('div');
                             taskEl.className = `task-card ${t.completed ? 'completed' : ''}`;
                             taskEl.onclick = (e) => {
-                                if(e.target.tagName !== 'BUTTON') {
-                                    requestPin('1984', 'edit-task', id, t);
-                                }
+                                if(e.target.tagName !== 'BUTTON') { requestPin('1984', 'edit-task', id, t); }
                             };
                             taskEl.innerHTML = `<strong>${t.tech}</strong><br>${t.desc}<button class="complete-btn" onclick="toggleComplete('${id}', ${t.completed})">${t.completed ? 'Revert' : 'Complete'}</button>`;
                             dayCol.appendChild(taskEl);
@@ -302,5 +395,3 @@
     </script>
 </body>
 </html>
-
-© 2026 Blu Computers. All Rights Reserved.
