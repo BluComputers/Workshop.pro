@@ -221,6 +221,7 @@
 const STORAGE_KEY='bluMaintenanceWorkspace_v1';
 const DEFAULT_GROUPS={Blue:'#3478d4',Green:'#199b72',Yellow:'#dfaa20',Red:'#d84b4b',Grey:'#718096',Purple:'#8864cb',Orange:'#e88421'};
 // Public web-app configuration for the BLU Maintenance Firebase project. Access is controlled by Firebase Authentication and Firestore Rules, not by hiding these client-side values.
+const GOOGLE_APPS_SCRIPT_EMAIL_ENDPOINT='https://script.google.com/macros/s/AKfycbzGHxgJD-sldv5UAKe8a641q7LxF7W2zStE2ddc3ZI_DrcyRk0K50NSUyYZYpLREXBq/exec';
 const FIREBASE_WEB_CONFIG={apiKey:'AIzaSyCua9NJEmqRTeCa9z5GS_t1fhX6TlAwS44',authDomain:'blu-maintenance.firebaseapp.com',projectId:'blu-maintenance',storageBucket:'blu-maintenance.firebasestorage.app',messagingSenderId:'482706766559',appId:'1:482706766559:web:0995321ebdd9196d72876a',measurementId:'G-M29EP762ZH'};
 const DEFAULT_STATE={vehicles:[],vorVehicles:[],jobs:[],inspections:[],pmiReports:[],lolaReports:[],driverChecks:[],driverCheckReports:[],notifications:[],activeNotification:null,pendingBreakdown:null,preferences:{workshopTitle:'Workshop Manager Software',accent:'#2878d0',groups:DEFAULT_GROUPS,partnerLogo:'',repeatDays:1825},firebase:{...FIREBASE_WEB_CONFIG,email:''}};
 let state=loadState();let weekStart=startOfWeek(new Date());let activeNav='calendar';let vorUnlocked=false;let cloud=null;let cloudWriteTimer=null;let cloudAlertsWriteTimer=null;let applyingCloud=false;let lastCloudPayload='';let lastAlertsPayload='';let toastTimer=null;let draggingJobId=null;let suppressJobClickUntil=0;let suppressJobClickJobId=null;
@@ -941,20 +942,63 @@ async function connectFirebase(cfg,password){
   });
   setSyncStatus('cloud','Live cloud sync connected');
 }
+function submitEmailToGoogleAppsScript(payload){
+  return new Promise((resolve,reject)=>{
+    const requestId='blu_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,12);
+    const frame=document.createElement('iframe');
+    frame.name='blu-gas-email-'+requestId;
+    frame.title='BLU Maintenance email delivery';
+    frame.setAttribute('aria-hidden','true');
+    Object.assign(frame.style,{position:'fixed',width:'1px',height:'1px',left:'-10000px',top:'-10000px',border:'0',opacity:'0'});
+    const form=document.createElement('form');
+    form.method='POST';form.action=GOOGLE_APPS_SCRIPT_EMAIL_ENDPOINT;form.target=frame.name;form.enctype='application/x-www-form-urlencoded';form.acceptCharset='UTF-8';
+    Object.assign(form.style,{display:'none'});
+    const fields={...payload,requestId};
+    for(const [name,value] of Object.entries(fields)){
+      const input=document.createElement('input');input.type='hidden';input.name=name;input.value=String(value??'');form.appendChild(input);
+    }
+    let settled=false;
+    const cleanup=()=>{window.removeEventListener('message',onMessage);clearTimeout(timer);form.remove();setTimeout(()=>frame.remove(),250);};
+    const finish=(ok,value)=>{if(settled)return;settled=true;cleanup();ok?resolve(value):reject(value instanceof Error?value:new Error(String(value||'Google Apps Script email failed.')));};
+    const onMessage=event=>{
+      const d=event.data;
+      if(!d||d.source!=='BLU_GAS_EMAIL'||d.requestId!==requestId)return;
+      if(d.ok)finish(true,d);else finish(false,new Error(d.message||'Google Apps Script could not send the email.'));
+    };
+    const timer=setTimeout(()=>finish(false,new Error('Google Apps Script did not confirm the email within 120 seconds. Check that the deployed web app is accessible to Anyone and that Code.gs has the correct Firebase authorised email.')),120000);
+    window.addEventListener('message',onMessage);
+    document.body.appendChild(frame);document.body.appendChild(form);
+    try{form.submit();}catch(err){finish(false,new Error('Could not submit the PDF to Google Apps Script: '+(err?.message||'unknown error')));}
+  });
+}
 async function sendInspectionPdfEmail(targetWindow,data){
   const reply=(ok,message)=>{try{targetWindow?.postMessage({source:'BLU_WORKSPACE',type:'EMAIL_PDF_RESULT',ok,message,reportType:data.reportType,registration:data.registration},'*')}catch(_){}};
   try{
     if(!cloud||!cloud.user)throw new Error('Connect to Firebase in Settings & Cloud Sync before emailing a report.');
-    const reportType=String(data.reportType||'').toUpperCase();if(!['PMI','LOLA'].includes(reportType))throw new Error('Only completed PMI and LOLA reports can be emailed.');
+    const reportType=String(data.reportType||'').toUpperCase();
+    if(!['PMI','LOLA'].includes(reportType))throw new Error('Only completed PMI and LOLA reports can be emailed.');
     if(!data.pdfBase64||typeof data.pdfBase64!=='string')throw new Error('The PDF file could not be generated. Please try again.');
-    showToast('Sending '+reportType+' PDF to Tyler…');
-    const functionsMod=await import('https://www.gstatic.com/firebasejs/11.0.2/firebase-functions.js');
-    const functions=functionsMod.getFunctions(cloud.app,'europe-west2');
-    const send=functionsMod.httpsCallable(functions,'emailInspectionPdf',{timeout:70000});
-    const result=await send({reportType,registration:String(data.registration||''),reportDate:String(data.reportDate||''),outcome:String(data.outcome||''),reportId:String(data.reportId||''),pdfBase64:data.pdfBase64});
-    if(!result?.data?.ok)throw new Error(result?.data?.message||'Email service did not confirm delivery.');
-    reply(true,'PDF email sent to Tyler@wnct.co.uk.');showToast(reportType+' PDF emailed to Tyler@wnct.co.uk.');
-  }catch(err){console.error('Inspection PDF email failed:',err);let message=String(err?.message||'Unknown email error');const code=String(err?.code||'');if(code.includes('functions/not-found')||code.includes('functions/unavailable'))message='The email service is not deployed or available yet. Follow the Firebase Functions email setup in README.md.';else if(code.includes('functions/unauthenticated'))message='Please sign in to Firebase again before emailing a report.';else if(code.includes('functions/permission-denied'))message='Your Firebase account is not authorised to email reports. Check BLU_ALLOWED_EMAILS in Firebase Functions secrets.';reply(false,'Could not email PDF: '+message);showToast('Could not email PDF: '+message);}
+    if(!['FIT FOR SERVICE','V.O.R','DECLARE FIT FOR SERVICE','RAMP NOT FIT FOR USE'].includes(String(data.outcome||'').trim().toUpperCase()))throw new Error('Choose a final Fit or Not Fit outcome before emailing. Drafts cannot be emailed as completed reports.');
+    showToast('Sending '+reportType+' PDF to Tyler via Google Apps Script…');
+    const idToken=await cloud.user.getIdToken(true);
+    const result=await submitEmailToGoogleAppsScript({
+      reportType,
+      registration:String(data.registration||''),
+      reportDate:String(data.reportDate||''),
+      outcome:String(data.outcome||''),
+      reportId:String(data.reportId||''),
+      idToken,
+      pdfBase64:data.pdfBase64
+    });
+    if(!result?.ok)throw new Error(result?.message||'Google Apps Script did not confirm delivery.');
+    reply(true,result.message||'PDF email sent to Tyler@wnct.co.uk.');
+    showToast(reportType+' PDF emailed to Tyler@wnct.co.uk.');
+  }catch(err){
+    console.error('Inspection PDF email failed:',err);
+    const message=String(err?.message||'Unknown email error');
+    reply(false,'Could not email PDF: '+message);
+    showToast('Could not email PDF: '+message);
+  }
 }
 function stateHasUserData(){return (state.vehicles?.length||0)+(state.vorVehicles?.length||0)+(state.jobs?.length||0)+(state.inspections?.length||0)+(state.pmiReports?.length||0)+(state.lolaReports?.length||0)+(state.driverChecks?.length||0)+(state.driverCheckReports?.length||0)>0;}
 async function writeCloud(){if(!cloud||applyingCloud)return;try{const payload=JSON.stringify(state);await cloud.mod.updateDoc(cloud.ref,{state,updatedAt:cloud.mod.serverTimestamp(),updatedBy:cloud.user?.email||''});lastCloudPayload=payload;setSyncStatus('cloud','Live cloud sync connected');}catch(e){console.error(e);setSyncStatus('local','Cloud sync error — saved locally');showToast('Cloud sync failed; changes remain saved on this device. Check Firestore rules and connection.');}}
